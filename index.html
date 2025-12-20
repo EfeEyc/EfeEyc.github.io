@@ -482,7 +482,15 @@
         import { getFirestore, doc, onSnapshot, setDoc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
         // --- DYNAMIC CONFIG (Replaces hardcoded keys) ---
-        const firebaseConfig = JSON.parse(__firebase_config);
+        const firebaseConfig = {
+          apiKey: "AIzaSyDnLvje5aDBGUkkpNWjkzgYeXMORtq2NE4",
+          authDomain: "itfaiyeatis.firebaseapp.com",
+          projectId: "itfaiyeatis",
+          storageBucket: "itfaiyeatis.firebasestorage.app",
+          messagingSenderId: "482460597064",
+          appId: "1:482460597064:web:ea4ec82fe55b45ad88517d",
+          measurementId: "G-CLWYM5H7VE"
+        };
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'ltac-weather-default';
         
         // --- APP LOGIC ---
@@ -539,11 +547,10 @@
                 auth = getAuth(app);
                 db = getFirestore(app);
 
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
+                // Since we are using a custom Firebase config (itfaiyeatis), 
+                // the environment's __initial_auth_token (minted for the default Canvas project) won't work.
+                // We default directly to anonymous auth.
+                await signInAnonymously(auth);
 
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
