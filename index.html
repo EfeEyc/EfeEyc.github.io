@@ -227,6 +227,17 @@
             animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Status Lights */
+        .led {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #334155;
+            display: inline-block;
+        }
+        .led.on { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+        .led.tx { background: #f97316; box-shadow: 0 0 8px #f97316; }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-200 min-h-screen flex flex-col items-center justify-center p-6 font-sans overflow-hidden selection:bg-orange-500 selection:text-white">
@@ -234,7 +245,10 @@
     <!-- Loader -->
     <div id="loader">
         <div class="spinner"></div>
-        <div class="text-slate-400 font-mono text-sm tracking-widest">CONNECTING TO DATALINK...</div>
+        <div id="loader-text" class="text-slate-400 font-mono text-sm tracking-widest text-center">
+            CONNECTING TO DATALINK...<br>
+            <span class="text-xs opacity-50 mt-2 block">If stuck here, check Firebase Config keys</span>
+        </div>
     </div>
 
     <!-- Mode Switcher (Visible only in Control Mode) -->
@@ -248,7 +262,13 @@
         <div class="flex flex-col md:flex-row justify-between items-center mb-8 border-b border-slate-800 pb-4 gap-4">
             <div class="flex items-center gap-4">
                 <h1 class="text-4xl font-bold text-white tracking-widest">LTAC</h1>
-                <span id="conn-status" class="bg-red-900 text-red-200 text-xs px-2 py-1 rounded border border-red-700 transition-colors">OFFLINE</span>
+                <div class="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded px-2 py-1">
+                    <span id="conn-status" class="text-[10px] font-bold text-red-500">OFFLINE</span>
+                    <div class="flex gap-1">
+                        <div id="led-tx" class="led" title="TX (Writing)"></div>
+                        <div id="led-rx" class="led" title="RX (Reading)"></div>
+                    </div>
+                </div>
             </div>
             
             <!-- Right Side: Frequencies & Clock -->
@@ -403,27 +423,31 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+        import { getFirestore, doc, onSnapshot, setDoc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
         // --- CONFIG ---
-        // IF YOU HOST THIS YOURSELF, REPLACE THE BELOW WITH YOUR OWN FIREBASE CONFIG
-        // You can get this from the Firebase Console -> Project Settings -> General
-        const firebaseConfig = {
-        apiKey: "AIzaSyDnLvje5aDBGUkkpNWjkzgYeXMORtq2NE4",
-        authDomain: "itfaiyeatis.firebaseapp.com",
-        projectId: "itfaiyeatis",
-        storageBucket: "itfaiyeatis.firebasestorage.app",
-        messagingSenderId: "482460597064",
-        appId: "1:482460597064:web:ea4ec82fe55b45ad88517d",
-        measurementId: "G-CLWYM5H7VE"
+        // REPLACE THIS WITH YOUR REAL KEYS FROM FIREBASE CONSOLE
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "AIzaSyDnLvje5aDBGUkkpNWjkzgYeXMORtq2NE4",
+            authDomain: "itfaiyeatis.firebaseapp.com",
+            projectId: "itfaiyeatis",
+            storageBucket: "itfaiyeatis.firebasestorage.app",
+            messagingSenderId: "482460597064",
+            appId: "1:482460597064:web:ea4ec82fe55b45ad88517d",
+            measurementId: "G-CLWYM5H7VE"
         };
         
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'itfaiyeatis-default';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'ltac-weather-default';
         
         // --- APP LOGIC ---
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+        let app, auth, db;
+        
+        // Status Elements
+        const statusText = document.getElementById('conn-status');
+        const ledTx = document.getElementById('led-tx');
+        const ledRx = document.getElementById('led-rx');
+        const loader = document.getElementById('loader');
+        const loaderText = document.getElementById('loader-text');
 
         // State
         let localState = {
@@ -443,12 +467,10 @@
             qnh: { min: 900, max: 1100 }
         };
 
-        // DOM elements
+        // DOM elements for Compass
         const arrow = document.getElementById('windArrow');
         const compassSpeedDisplay = document.getElementById('compass-speed-display');
         const dirTextDisplay = document.getElementById('dir-text');
-        const statusBadge = document.getElementById('conn-status');
-        const loader = document.getElementById('loader');
 
         // Check Mode
         const urlParams = new URLSearchParams(window.location.search);
@@ -461,63 +483,105 @@
 
         // --- FIREBASE SYNC ---
         async function init() {
+            // 1. Config Check
+            if (firebaseConfig.apiKey === "YOUR_API_KEY") {
+                loaderText.innerHTML = `
+                    <span class="text-red-500 font-bold">ERROR: MISSING CONFIG</span><br><br>
+                    You must open this file in a text editor<br>and paste your Firebase keys at line ~390.
+                `;
+                return;
+            }
+
             try {
-                // Check if we have a custom token from the environment (internal use)
-                // For external use, it will fall back to anonymous
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                // Internal Auth for preview vs Anonymous for public
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                     // Using internal auth if available
-                     // Note: This specific function isn't imported from standard SDK usually, but in this env it is managed.
-                     // For external hosting, signInAnonymously is the way.
+                     // Internal env handled by wrapper usually, but if needed we can sign in custom
                 } 
                 
                 await signInAnonymously(auth);
 
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
-                        statusBadge.innerText = "ONLINE";
-                        statusBadge.className = "bg-green-900 text-green-200 text-xs px-2 py-1 rounded border border-green-700 transition-colors";
+                        statusText.innerText = "ONLINE";
+                        statusText.className = "text-[10px] font-bold text-green-500";
                         loader.style.display = 'none';
-                        setupRealtimeListener(user);
+                        setupRealtimeListener();
+                        // Start polling as backup immediately
+                        setInterval(manualFetch, 5000); 
                     } else {
-                        statusBadge.innerText = "AUTH FAIL";
-                        statusBadge.className = "bg-red-900 text-red-200";
+                        statusText.innerText = "AUTH FAIL";
+                        statusText.className = "text-[10px] font-bold text-red-500";
                     }
                 });
 
             } catch (e) {
                 console.error("Auth Error", e);
-                statusBadge.innerText = "ERROR";
-                loader.innerText = "CONNECTION FAILED. CHECK CONSOLE.";
+                statusText.innerText = "ERR";
+                loaderText.innerHTML = `CONNECTION FAILED:<br>${e.message}`;
             }
         }
 
-        function setupRealtimeListener(user) {
-            // Path: artifacts/{appId}/public/data/atis
-            // We use 'public' data so both controller and display can see it without same-user login requirement
+        function setupRealtimeListener() {
             const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'ltac_weather');
 
             onSnapshot(docRef, (docSnap) => {
                 if (docSnap.exists()) {
                     localState = docSnap.data();
+                    flashRx();
                     updateUI();
                 } else {
-                    // Create doc if missing
-                    setDoc(docRef, localState);
+                    // Create doc if missing (Controller only)
+                    if (!isDisplayMode) setDoc(docRef, localState);
                 }
             }, (error) => {
-                console.error("Sync Error:", error);
-                statusBadge.innerText = "SYNC ERR";
+                console.error("Listener Error:", error);
+                statusText.innerText = "SYNC ERR";
             });
         }
 
+        async function manualFetch() {
+            // Polling fallback - fetches data even if socket dead
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'ltac_weather');
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    // Simple check if changed to avoid unnecessary redraws/flashing
+                    if (JSON.stringify(data) !== JSON.stringify(localState)) {
+                        localState = data;
+                        flashRx();
+                        updateUI();
+                    }
+                }
+            } catch(e) {
+                console.log("Polling fail", e);
+            }
+        }
+
         async function pushUpdate() {
-            if (isDisplayMode) return; // Display mode cannot write
+            if (isDisplayMode) return; 
+            flashTx();
             const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'ltac_weather');
             try {
                 await updateDoc(docRef, localState);
             } catch (e) {
                 console.error("Write Error", e);
+                statusText.innerText = "WRITE ERR";
             }
+        }
+
+        // Indicator Flashers
+        function flashTx() {
+            ledTx.classList.add('tx');
+            setTimeout(() => ledTx.classList.remove('tx'), 200);
+        }
+        function flashRx() {
+            ledRx.classList.add('on');
+            setTimeout(() => ledRx.classList.remove('on'), 200);
         }
 
         // --- UI LOGIC ---
@@ -529,8 +593,8 @@
                 if(newVal > limits[key].max) newVal = limits[key].max;
             }
             localState[key] = newVal;
-            updateUI(); // Immediate local feedback
-            pushUpdate(); // Send to DB
+            updateUI(); 
+            pushUpdate(); 
         };
 
         window.adjustDir = function(delta) {
@@ -550,7 +614,6 @@
         };
 
         function updateUI() {
-            // Update Controls (if visible)
             if(!isDisplayMode) {
                 document.getElementById('val-temp').innerText = localState.temp;
                 document.getElementById('val-dew').innerText = localState.dew;
@@ -567,13 +630,12 @@
                     gustEl.classList.remove('text-orange-500');
                 }
             } else {
-                // Update Display Mode Text
                 document.getElementById('disp-temp').innerText = localState.temp;
                 document.getElementById('disp-dew').innerText = localState.dew;
                 document.getElementById('disp-qnh').innerText = localState.qnh;
             }
 
-            // Common Updates (Compass)
+            // Compass
             compassSpeedDisplay.innerText = localState.windSpd;
             const dirStr = localState.windDir.toString().padStart(3, '0') + "°";
             dirTextDisplay.innerText = dirStr;
@@ -582,7 +644,6 @@
 
         // --- VISUALS ---
         
-        // Compass Face Gen
         function initCompassFace() {
             const faceContainer = document.getElementById('compass-face');
             const numberRadius = 145; 
@@ -621,7 +682,6 @@
             }
         }
 
-        // Jitter & Clock
         function updateClock() {
             const now = new Date();
             const h = now.getUTCHours().toString().padStart(2, '0');
@@ -645,7 +705,7 @@
         // Init
         initCompassFace();
         updateClock();
-        init(); // Start Firebase
+        init(); 
 
     </script>
 </body>
