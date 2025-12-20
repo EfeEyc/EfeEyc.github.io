@@ -16,6 +16,16 @@
             background-color: #020617; /* Slate 950 */
         }
 
+        /* Remove arrows/spinners from number inputs */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+
         .glass-panel {
             background: rgba(30, 41, 59, 0.7);
             backdrop-filter: blur(10px);
@@ -212,6 +222,11 @@
         .display-mode-hidden {
             display: none !important;
         }
+
+        /* Display Only Elements (Hidden in Control Mode) */
+        .display-mode-show {
+            display: none; /* Default hidden */
+        }
         
         /* Loader */
         #loader {
@@ -309,7 +324,7 @@
             <div class="glass-panel p-8 rounded-xl flex flex-col items-center justify-center relative overflow-visible min-h-[350px]">
                  <!-- Direction Text Readout -->
                  <div class="dir-display">
-                    <div class="text-[9px] text-slate-500 font-bold tracking-wider mb-[-2px]">DIR</div>
+                    <div class="text-[9px] text-slate-400 font-bold tracking-wider mb-[-2px]">DIR</div>
                     <div id="dir-text" class="text-3xl font-bold text-white font-mono" style="text-shadow: 0 0 10px rgba(0,0,0,0.5);">340°</div>
                 </div>
 
@@ -331,32 +346,32 @@
                     </div>
                     <!-- Center Speed -->
                     <div class="speed-dial">
-                        <span class="text-xs text-slate-500 font-bold mb-[-2px]">KTS</span>
+                        <span class="text-xs text-slate-400 font-bold mb-[-2px]">KTS</span>
                         <span id="compass-speed-display" class="text-3xl font-bold text-orange-500 font-mono">12</span>
                     </div>
                 </div>
             </div>
 
-            <!-- Wind Controls (Speed/Gust/Dir) - Control UI Only -->
+            <!-- Wind Controls (Control UI Only) -->
             <div class="glass-panel p-6 rounded-xl flex flex-col gap-6 control-ui">
-                <h2 class="text-slate-500 text-xs font-bold tracking-widest border-b border-slate-700 pb-2">WIND CONTROL</h2>
+                <h2 class="text-slate-400 text-xs font-bold tracking-widest border-b border-slate-700 pb-2">WIND CONTROL</h2>
                 
                 <div class="grid grid-cols-2 gap-6">
                     <!-- Speed -->
                     <div>
-                        <label class="block text-xs text-slate-500 mb-2 font-bold tracking-wider">SPEED (KTS)</label>
+                        <label class="block text-xs text-slate-400 mb-2 font-bold tracking-wider">SPEED (KTS)</label>
                         <div class="flex items-center bg-slate-900 rounded border border-slate-700 p-1 justify-between">
                             <button class="stepper-btn w-10 h-10 rounded text-xl flex items-center justify-center" onclick="adjustValue('windSpd', -1)">-</button>
-                            <span id="val-windSpd" class="font-mono text-2xl font-bold text-white">12</span>
+                            <input type="number" id="val-windSpd" value="12" onchange="manualInput('windSpd', this.value)" class="bg-transparent font-mono text-2xl font-bold text-white text-center w-20 outline-none border-b border-transparent hover:border-slate-600 focus:border-orange-500 transition-colors">
                             <button class="stepper-btn w-10 h-10 rounded text-xl flex items-center justify-center" onclick="adjustValue('windSpd', 1)">+</button>
                         </div>
                     </div>
                     <!-- Gusts -->
                     <div>
-                        <label class="block text-xs text-slate-500 mb-2 font-bold tracking-wider">GUSTS (KTS)</label>
+                        <label class="block text-xs text-slate-400 mb-2 font-bold tracking-wider">GUSTS (KTS)</label>
                         <div class="flex items-center bg-slate-900 rounded border border-slate-700 p-1 justify-between">
                             <button class="stepper-btn w-10 h-10 rounded text-xl flex items-center justify-center" onclick="adjustValue('windGust', -1)">-</button>
-                            <span id="val-windGust" class="font-mono text-2xl font-bold text-slate-500">0</span>
+                            <input type="number" id="val-windGust" value="0" onchange="manualInput('windGust', this.value)" class="bg-transparent font-mono text-2xl font-bold text-slate-500 text-center w-20 outline-none border-b border-transparent hover:border-slate-600 focus:border-orange-500 transition-colors">
                             <button class="stepper-btn w-10 h-10 rounded text-xl flex items-center justify-center" onclick="adjustValue('windGust', 1)">+</button>
                         </div>
                     </div>
@@ -364,11 +379,11 @@
 
                 <!-- Wind Direction Buttons -->
                 <div>
-                    <label class="block text-xs text-slate-500 mb-2 font-bold tracking-wider">DIRECTION</label>
+                    <label class="block text-xs text-slate-400 mb-2 font-bold tracking-wider">DIRECTION</label>
                     <div class="flex flex-col gap-3">
                         <div class="flex items-center bg-slate-900 rounded border border-slate-700 p-1 justify-between">
                             <button class="stepper-btn w-12 h-10 rounded text-sm flex items-center justify-center" onclick="adjustDir(-10)">-10°</button>
-                            <span class="text-[10px] text-slate-500 font-bold tracking-widest">FINE TUNE</span>
+                            <span class="text-[10px] text-slate-400 font-bold tracking-widest">FINE TUNE</span>
                             <button class="stepper-btn w-12 h-10 rounded text-sm flex items-center justify-center" onclick="adjustDir(10)">+10°</button>
                         </div>
                         <div class="flex gap-2">
@@ -383,6 +398,25 @@
                 </div>
             </div>
 
+            <!-- Display Mode Wind Data (Hidden in Control Mode) -->
+            <div class="glass-panel p-6 rounded-xl display-mode-show flex-col justify-center gap-8 min-w-[300px]" id="display-mode-wind">
+                 <h2 class="text-slate-400 text-sm font-bold tracking-widest border-b border-slate-700 pb-2 mb-2">WIND DATA</h2>
+                 <div class="grid grid-cols-1 gap-6 text-white font-mono">
+                    <div class="flex justify-between items-end border-b border-slate-800 pb-2">
+                        <span class="text-slate-400 text-sm tracking-widest">WIND DIR</span>
+                        <span class="text-4xl font-bold"><span id="disp-windDir">340</span>°</span>
+                    </div>
+                    <div class="flex justify-between items-end border-b border-slate-800 pb-2">
+                        <span class="text-slate-400 text-sm tracking-widest">SPEED</span>
+                        <span class="text-4xl font-bold"><span id="disp-windSpd">12</span> KT</span>
+                    </div>
+                    <div class="flex justify-between items-end border-b border-slate-800 pb-2">
+                        <span class="text-slate-400 text-sm tracking-widest">GUSTS</span>
+                        <span class="text-4xl font-bold"><span id="disp-windGust">0</span> KT</span>
+                    </div>
+                 </div>
+            </div>
+
         </div>
 
         <!-- RIGHT COLUMN: Environment & Pressure -->
@@ -390,34 +424,34 @@
             
             <!-- Environment Panel -->
             <div class="glass-panel p-6 rounded-xl flex flex-col gap-6 control-ui">
-                <h2 class="text-slate-500 text-xs font-bold tracking-widest border-b border-slate-700 pb-2">ENVIRONMENT</h2>
+                <h2 class="text-slate-400 text-xs font-bold tracking-widest border-b border-slate-700 pb-2">ENVIRONMENT</h2>
                 
                 <!-- Temp -->
                 <div>
-                    <label class="block text-xs text-slate-500 mb-2 font-bold tracking-wider">TEMP (°C)</label>
+                    <label class="block text-xs text-slate-400 mb-2 font-bold tracking-wider">TEMP (°C)</label>
                     <div class="flex items-center bg-slate-900 rounded border border-slate-700 p-1 justify-between">
                         <button class="stepper-btn w-10 h-10 rounded text-xl flex items-center justify-center" onclick="adjustValue('temp', -1)">-</button>
-                        <span id="val-temp" class="font-mono text-2xl font-bold text-white">18</span>
+                        <input type="number" id="val-temp" value="18" onchange="manualInput('temp', this.value)" class="bg-transparent font-mono text-2xl font-bold text-white text-center w-20 outline-none border-b border-transparent hover:border-slate-600 focus:border-orange-500 transition-colors">
                         <button class="stepper-btn w-10 h-10 rounded text-xl flex items-center justify-center" onclick="adjustValue('temp', 1)">+</button>
                     </div>
                 </div>
 
                 <!-- Dew -->
                 <div>
-                    <label class="block text-xs text-slate-500 mb-2 font-bold tracking-wider">DEW POINT (°C)</label>
+                    <label class="block text-xs text-slate-400 mb-2 font-bold tracking-wider">DEW POINT (°C)</label>
                     <div class="flex items-center bg-slate-900 rounded border border-slate-700 p-1 justify-between">
                         <button class="stepper-btn w-10 h-10 rounded text-xl flex items-center justify-center" onclick="adjustValue('dew', -1)">-</button>
-                        <span id="val-dew" class="font-mono text-2xl font-bold text-white">10</span>
+                        <input type="number" id="val-dew" value="10" onchange="manualInput('dew', this.value)" class="bg-transparent font-mono text-2xl font-bold text-white text-center w-20 outline-none border-b border-transparent hover:border-slate-600 focus:border-orange-500 transition-colors">
                         <button class="stepper-btn w-10 h-10 rounded text-xl flex items-center justify-center" onclick="adjustValue('dew', 1)">+</button>
                     </div>
                 </div>
 
                 <!-- Vis -->
                 <div>
-                    <label class="block text-xs text-slate-500 mb-2 font-bold tracking-wider">VISIBILITY (M)</label>
+                    <label class="block text-xs text-slate-400 mb-2 font-bold tracking-wider">VISIBILITY (M)</label>
                     <div class="flex items-center bg-slate-900 rounded border border-slate-700 p-1 justify-between">
                         <button class="stepper-btn w-10 h-10 rounded text-xl flex items-center justify-center" onclick="adjustValue('vis', -100)">-</button>
-                        <span id="val-vis" class="font-mono text-2xl font-bold text-white">9999</span>
+                        <input type="number" id="val-vis" value="9999" onchange="manualInput('vis', this.value)" class="bg-transparent font-mono text-2xl font-bold text-white text-center w-24 outline-none border-b border-transparent hover:border-slate-600 focus:border-orange-500 transition-colors">
                         <button class="stepper-btn w-10 h-10 rounded text-xl flex items-center justify-center" onclick="adjustValue('vis', 100)">+</button>
                     </div>
                 </div>
@@ -425,47 +459,51 @@
 
             <!-- Pressure Panel -->
             <div class="glass-panel p-6 rounded-xl flex flex-col gap-6 control-ui">
-                <h2 class="text-slate-500 text-xs font-bold tracking-widest border-b border-slate-700 pb-2">PRESSURE</h2>
+                <h2 class="text-slate-400 text-xs font-bold tracking-widest border-b border-slate-700 pb-2">PRESSURE</h2>
 
                 <!-- QNH -->
                 <div>
-                    <label class="block text-xs text-slate-500 mb-2 font-bold tracking-wider">QNH (hPa)</label>
+                    <label class="block text-xs text-slate-400 mb-2 font-bold tracking-wider">QNH (hPa)</label>
                     <div class="flex items-center bg-slate-900 rounded border border-slate-700 p-1 justify-between">
                         <button class="stepper-btn w-10 h-10 rounded text-xl flex items-center justify-center" onclick="adjustValue('qnh', -1)">-</button>
-                        <span id="val-qnh" class="font-mono text-2xl font-bold text-white">1013</span>
+                        <input type="number" id="val-qnh" value="1013" onchange="manualInput('qnh', this.value)" class="bg-transparent font-mono text-2xl font-bold text-white text-center w-20 outline-none border-b border-transparent hover:border-slate-600 focus:border-orange-500 transition-colors">
                         <button class="stepper-btn w-10 h-10 rounded text-xl flex items-center justify-center" onclick="adjustValue('qnh', 1)">+</button>
                     </div>
                 </div>
 
                 <!-- QFE -->
                 <div>
-                    <label class="block text-xs text-slate-500 mb-2 font-bold tracking-wider">QFE (hPa)</label>
+                    <label class="block text-xs text-slate-400 mb-2 font-bold tracking-wider">QFE (hPa)</label>
                     <div class="flex items-center bg-slate-900 rounded border border-slate-700 p-1 justify-between">
                         <button class="stepper-btn w-10 h-10 rounded text-xl flex items-center justify-center" onclick="adjustValue('qfe', -1)">-</button>
-                        <span id="val-qfe" class="font-mono text-2xl font-bold text-white">898</span>
+                        <input type="number" id="val-qfe" value="898" onchange="manualInput('qfe', this.value)" class="bg-transparent font-mono text-2xl font-bold text-white text-center w-20 outline-none border-b border-transparent hover:border-slate-600 focus:border-orange-500 transition-colors">
                         <button class="stepper-btn w-10 h-10 rounded text-xl flex items-center justify-center" onclick="adjustValue('qfe', 1)">+</button>
                     </div>
                 </div>
             </div>
 
             <!-- Display Mode Data (Hidden in Control Mode) -->
-            <div class="glass-panel p-6 rounded-xl hidden flex-col justify-center gap-8 min-w-[300px]" id="display-mode-atmos">
-                 <h2 class="text-slate-500 text-sm font-bold tracking-widest border-b border-slate-700 pb-2 mb-2">METEOROLOGICAL DATA</h2>
+            <div class="glass-panel p-6 rounded-xl display-mode-show flex-col justify-center gap-8 min-w-[300px]" id="display-mode-atmos">
+                 <h2 class="text-slate-400 text-sm font-bold tracking-widest border-b border-slate-700 pb-2 mb-2">METEOROLOGICAL DATA</h2>
                  <div class="grid grid-cols-1 gap-8 text-white font-mono">
                     <div class="flex justify-between items-end border-b border-slate-800 pb-2">
-                        <span class="text-slate-500 text-sm tracking-widest">TEMP / DEW</span>
-                        <span class="text-4xl font-bold"><span id="disp-temp">18</span>° / <span id="disp-dew">10</span>°</span>
+                        <span class="text-slate-400 text-sm tracking-widest">TEMP</span>
+                        <span class="text-4xl font-bold"><span id="disp-temp">18</span>°C</span>
                     </div>
                     <div class="flex justify-between items-end border-b border-slate-800 pb-2">
-                        <span class="text-slate-500 text-sm tracking-widest">VISIBILITY</span>
+                        <span class="text-slate-400 text-sm tracking-widest">DEW POINT</span>
+                        <span class="text-4xl font-bold"><span id="disp-dew">10</span>°C</span>
+                    </div>
+                    <div class="flex justify-between items-end border-b border-slate-800 pb-2">
+                        <span class="text-slate-400 text-sm tracking-widest">VISIBILITY</span>
                         <span class="text-4xl font-bold" id="disp-vis">9999</span>
                     </div>
                     <div class="flex justify-between items-end border-b border-slate-800 pb-2">
-                        <span class="text-slate-500 text-sm tracking-widest">QNH</span>
+                        <span class="text-slate-400 text-sm tracking-widest">QNH</span>
                         <span class="text-4xl font-bold" id="disp-qnh">1013</span>
                     </div>
                     <div class="flex justify-between items-end border-b border-slate-800 pb-2">
-                        <span class="text-slate-500 text-sm tracking-widest">QFE</span>
+                        <span class="text-slate-400 text-sm tracking-widest">QFE</span>
                         <span class="text-4xl font-bold" id="disp-qfe">898</span>
                     </div>
                  </div>
@@ -536,8 +574,14 @@
 
         if (isDisplayMode) {
             document.querySelectorAll('.control-ui').forEach(el => el.classList.add('display-mode-hidden'));
+            
+            // Show Display Mode Panels
             document.getElementById('display-mode-atmos').classList.remove('hidden');
-            document.getElementById('display-mode-atmos').style.display = 'flex'; // Override hidden with flex
+            document.getElementById('display-mode-atmos').style.display = 'flex'; 
+            
+            document.getElementById('display-mode-wind').classList.remove('hidden');
+            document.getElementById('display-mode-wind').classList.add('flex');
+            document.getElementById('display-mode-wind').style.display = 'flex';
         }
 
         // --- FIREBASE SYNC ---
@@ -631,6 +675,20 @@
         }
 
         // --- UI LOGIC ---
+        
+        // Manual Input Handler
+        window.manualInput = function(key, val) {
+            let v = parseInt(val);
+            if (isNaN(v)) return; // Keep old value if invalid
+
+            if(limits[key]) {
+                if(v < limits[key].min) v = limits[key].min;
+                if(v > limits[key].max) v = limits[key].max;
+            }
+            localState[key] = v;
+            updateUI(); 
+            pushUpdate();
+        }
 
         window.adjustValue = function(key, delta) {
             let newVal = localState[key] + delta;
@@ -661,16 +719,23 @@
         };
 
         function updateUI() {
+            // Update Inputs (Control Mode)
             if(!isDisplayMode) {
-                document.getElementById('val-temp').innerText = localState.temp;
-                document.getElementById('val-dew').innerText = localState.dew;
-                document.getElementById('val-qnh').innerText = localState.qnh;
-                document.getElementById('val-qfe').innerText = localState.qfe || 898; 
-                document.getElementById('val-vis').innerText = localState.vis || 9999;
-                document.getElementById('val-windSpd').innerText = localState.windSpd;
-                
+                // We use .value for inputs now instead of innerText
+                const setVal = (id, val) => {
+                    const el = document.getElementById(id);
+                    if(el && document.activeElement !== el) el.value = val;
+                };
+
+                setVal('val-temp', localState.temp);
+                setVal('val-dew', localState.dew);
+                setVal('val-qnh', localState.qnh);
+                setVal('val-qfe', localState.qfe || 898);
+                setVal('val-vis', localState.vis || 9999);
+                setVal('val-windSpd', localState.windSpd);
+                setVal('val-windGust', localState.windGust);
+
                 const gustEl = document.getElementById('val-windGust');
-                gustEl.innerText = localState.windGust;
                 if(localState.windGust > 0) {
                     gustEl.classList.remove('text-slate-500');
                     gustEl.classList.add('text-orange-500');
@@ -679,14 +744,21 @@
                     gustEl.classList.remove('text-orange-500');
                 }
             } else {
+                // Update Display Mode Text
                 document.getElementById('disp-temp').innerText = localState.temp;
                 document.getElementById('disp-dew').innerText = localState.dew;
                 document.getElementById('disp-qnh').innerText = localState.qnh;
                 document.getElementById('disp-qfe').innerText = localState.qfe || 898;
                 document.getElementById('disp-vis').innerText = localState.vis || 9999;
+                
+                // Wind Display Panel
+                const dirStr = localState.windDir.toString().padStart(3, '0');
+                document.getElementById('disp-windDir').innerText = dirStr;
+                document.getElementById('disp-windSpd').innerText = localState.windSpd;
+                document.getElementById('disp-windGust').innerText = localState.windGust;
             }
 
-            // Compass
+            // Compass (Always updates)
             compassSpeedDisplay.innerText = localState.windSpd;
             const dirStr = localState.windDir.toString().padStart(3, '0') + "°";
             dirTextDisplay.innerText = dirStr;
