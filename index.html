@@ -426,8 +426,7 @@
         import { getFirestore, doc, onSnapshot, setDoc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
         // --- CONFIG ---
-        // REPLACE THIS WITH YOUR REAL KEYS FROM FIREBASE CONSOLE
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+        const firebaseConfig = {
             apiKey: "AIzaSyDnLvje5aDBGUkkpNWjkzgYeXMORtq2NE4",
             authDomain: "itfaiyeatis.firebaseapp.com",
             projectId: "itfaiyeatis",
@@ -483,15 +482,6 @@
 
         // --- FIREBASE SYNC ---
         async function init() {
-            // 1. Config Check
-            if (firebaseConfig.apiKey === "YOUR_API_KEY") {
-                loaderText.innerHTML = `
-                    <span class="text-red-500 font-bold">ERROR: MISSING CONFIG</span><br><br>
-                    You must open this file in a text editor<br>and paste your Firebase keys at line ~390.
-                `;
-                return;
-            }
-
             try {
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
@@ -499,7 +489,7 @@
 
                 // Internal Auth for preview vs Anonymous for public
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                     // Internal env handled by wrapper usually, but if needed we can sign in custom
+                     // Internal env handled by wrapper usually
                 } 
                 
                 await signInAnonymously(auth);
@@ -525,8 +515,13 @@
             }
         }
 
+        // CORRECTED PATH: Must have even number of segments (6 here) to be a Document
+        const COLLECTION_NAME = 'ltac_weather'; // Subcollection
+        const DOC_ID = 'live'; // Document ID
+
         function setupRealtimeListener() {
-            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'ltac_weather');
+            // Path: artifacts/{appId}/public/data/{COLLECTION_NAME}/{DOC_ID}
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', COLLECTION_NAME, DOC_ID);
 
             onSnapshot(docRef, (docSnap) => {
                 if (docSnap.exists()) {
@@ -544,13 +539,11 @@
         }
 
         async function manualFetch() {
-            // Polling fallback - fetches data even if socket dead
             try {
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'ltac_weather');
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', COLLECTION_NAME, DOC_ID);
                 const docSnap = await getDoc(docRef);
                 if (docSnap.exists()) {
                     const data = docSnap.data();
-                    // Simple check if changed to avoid unnecessary redraws/flashing
                     if (JSON.stringify(data) !== JSON.stringify(localState)) {
                         localState = data;
                         flashRx();
@@ -565,7 +558,7 @@
         async function pushUpdate() {
             if (isDisplayMode) return; 
             flashTx();
-            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'ltac_weather');
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', COLLECTION_NAME, DOC_ID);
             try {
                 await updateDoc(docRef, localState);
             } catch (e) {
