@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LTAC Weather Control</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Compass specific styles */
+        .compass-container {
+            position: relative;
+            width: 320px; 
+            height: 320px;
+            margin: 0 auto;
+            user-select: none;
+        }
+
+        /* The Ring itself */
+        .compass-ring {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 240px; 
+            height: 240px;
+            border-radius: 50%;
+            border: 4px solid #334155;
+            background: radial-gradient(circle, #1e293b 0%, #0f172a 100%);
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            z-index: 1;
+        }
+
+        /* The numbers on the dial - OUTSIDE the ring */
+        .compass-number {
+            position: absolute;
+            color: #64748b;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 0.85rem;
+            transform-origin: center;
+            user-select: none;
+            pointer-events: none;
+            z-index: 5;
+        }
+        
+        .compass-number.cardinal {
+            color: #f97316;
+            font-size: 1.1rem;
+            font-weight: 900;
+            text-shadow: 0 0 5px rgba(0,0,0,0.8);
+        }
+
+        /* Runway 03/21 Indicator */
+        .runway-line {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 16px; 
+            height: 220px; 
+            background: rgba(51, 65, 85, 0.4); 
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            transform: translate(-50%, -50%) rotate(30deg); 
+            pointer-events: none;
+            z-index: 2; 
+            border-radius: 2px;
+        }
+        
+        .runway-line::after {
+            content: '';
+            position: absolute;
+            top: 5px;
+            bottom: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 2px;
+            background: repeating-linear-gradient(to bottom, 
+                rgba(255,255,255,0.3) 0, 
+                rgba(255,255,255,0.3) 8px, 
+                transparent 8px, 
+                transparent 16px
+            );
+        }
+
+        .runway-label-top {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255,255,255,0.5);
+            font-size: 10px;
+            font-weight: bold;
+            font-family: monospace;
+        }
+        .runway-label-bottom {
+            position: absolute;
+            bottom: -15px;
+            left: 50%;
+            transform: translateX(-50%) rotate(180deg);
+            color: rgba(255,255,255,0.5);
+            font-size: 10px;
+            font-weight: bold;
+            font-family: monospace;
+        }
+
+        .compass-arrow {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 4px;
+            height: 120px;
+            background: transparent;
+            transform-origin: bottom center; 
+            transform: translate(-50%, -100%) rotate(0deg);
+            pointer-events: none;
+            z-index: 10;
+            transition: transform 2s ease-in-out; 
+        }
+
+        .arrow-head {
+            position: absolute;
+            top: -10px;
+            left: -6px;
+            width: 0; 
+            height: 0; 
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-bottom: 20px solid #f97316; 
+        }
+        
+        .arrow-shaft {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #f97316;
+        }
+
+        /* Center Speed Dial */
+        .speed-dial {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 80px;
+            background: #0f172a;
+            border: 2px solid #475569;
+            border-radius: 50%;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 15px rgba(0,0,0,0.8);
+        }
+
+        /* Direction Text Display - TOP RIGHT */
+        .dir-display {
+            position: absolute;
+            top: 20px; 
+            right: 20px;
+            z-index: 15;
+            text-align: right;
+            pointer-events: none;
+        }
+
+        .digital-font {
+            font-family: 'Courier New', Courier, monospace;
+            letter-spacing: -0.5px;
+        }
+        
+        /* Stepper Button Styles */
+        .stepper-btn {
+            background-color: #1e293b;
+            border: 1px solid #475569;
+            color: #94a3b8;
+            font-weight: bold;
+            transition: all 0.1s;
+        }
+        .stepper-btn:hover {
+            background-color: #334155;
+            color: white;
+        }
+        .stepper-btn:active {
+            background-color: #f97316;
+            border-color: #f97316;
+            color: white;
+            transform: scale(0.95);
+        }
+
+        /* Hidden UI for Display Mode */
+        .display-mode-hidden {
+            display: none !important;
+        }
+        
+        /* Loader */
+        #loader {
+            position: fixed;
+            inset: 0;
+            background: #0f172a;
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #334155;
+            border-top: 4px solid #f97316;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200 min-h-screen flex flex-col items-center justify-center p-6 font-sans overflow-hidden selection:bg-orange-500 selection:text-white">
+
+    <!-- Loader -->
+    <div id="loader">
+        <div class="spinner"></div>
+        <div class="text-slate-400 font-mono text-sm tracking-widest">CONNECTING TO DATALINK...</div>
+    </div>
+
+    <!-- Mode Switcher (Visible only in Control Mode) -->
+    <a id="display-link-btn" href="?mode=display" target="_blank" class="fixed top-4 right-4 bg-slate-800 text-slate-400 hover:text-white text-xs px-3 py-2 rounded border border-slate-700 transition-colors z-50 flex items-center gap-2 control-ui">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+        OPEN DISPLAY VIEW
+    </a>
+
+    <div class="w-full max-w-5xl">
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row justify-between items-center mb-8 border-b border-slate-800 pb-4 gap-4">
+            <div class="flex items-center gap-4">
+                <h1 class="text-4xl font-bold text-white tracking-widest">LTAC</h1>
+                <span id="conn-status" class="bg-red-900 text-red-200 text-xs px-2 py-1 rounded border border-red-700 transition-colors">OFFLINE</span>
+            </div>
+            
+            <!-- Right Side: Frequencies & Clock -->
+            <div class="flex flex-wrap gap-4 justify-center md:justify-end">
+                <!-- TOWER -->
+                <div class="glass-panel px-4 py-2 rounded-lg flex flex-col items-center min-w-[100px]">
+                    <div class="text-[10px] text-slate-400 font-bold tracking-widest">TOWER</div>
+                    <div class="text-2xl font-mono text-white font-bold digital-font">120.6</div>
+                </div>
+
+                <!-- APPROACH -->
+                <div class="glass-panel px-4 py-2 rounded-lg flex flex-col items-center min-w-[100px]">
+                    <div class="text-[10px] text-slate-400 font-bold tracking-widest">APPROACH</div>
+                    <div class="text-2xl font-mono text-white font-bold digital-font">119.6</div>
+                </div>
+
+                <!-- Live UTC Clock -->
+                <div class="glass-panel px-6 py-2 rounded-lg flex flex-col items-center min-w-[150px]">
+                    <div class="text-[10px] text-slate-400 font-bold tracking-widest">ZULU TIME</div>
+                    <div id="utc-clock" class="text-2xl font-mono text-white font-bold digital-font">00:00:00</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="space-y-6">
+            
+            <!-- 1. Compass Panel -->
+            <div class="glass-panel p-8 rounded-xl flex flex-col items-center justify-center relative overflow-visible min-h-[350px]">
+                
+                <!-- Direction Text Readout -->
+                <div class="dir-display">
+                    <div class="text-[10px] text-slate-500 font-bold tracking-wider mb-[-2px]">DIR</div>
+                    <div id="dir-text" class="text-3xl font-bold text-white font-mono" style="text-shadow: 0 0 10px rgba(0,0,0,0.5);">340°</div>
+                </div>
+
+                <!-- Compass -->
+                <div class="compass-container relative z-10" id="compass">
+                    <!-- The Ring -->
+                    <div class="compass-ring">
+                        <div class="runway-line">
+                            <span class="runway-label-top">03</span>
+                            <span class="runway-label-bottom">21</span>
+                        </div>
+                    </div>
+                    <!-- Ticks -->
+                    <div id="compass-face" class="absolute inset-0 pointer-events-none"></div>
+                    <!-- Arrow -->
+                    <div class="compass-arrow" id="windArrow">
+                        <div class="arrow-shaft"></div>
+                        <div class="arrow-head"></div>
+                    </div>
+                    <!-- Center Speed -->
+                    <div class="speed-dial">
+                        <span class="text-xs text-slate-500 font-bold mb-[-2px]">KTS</span>
+                        <span id="compass-speed-display" class="text-3xl font-bold text-orange-500 font-mono">12</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Atmos Box -->
+            <div class="glass-panel p-6 rounded-xl control-ui">
+                 <div class="grid grid-cols-2 gap-6">
+                    <!-- Temp/Dew Control -->
+                    <div>
+                        <label class="block text-xs text-slate-500 mb-2 font-bold tracking-wider">TEMP / DEW (°C)</label>
+                        <div class="flex gap-4 items-center">
+                            <!-- Temp -->
+                            <div class="flex items-center bg-slate-900 rounded border border-slate-700 p-1 flex-1 justify-between">
+                                <button class="stepper-btn w-8 h-8 rounded text-lg flex items-center justify-center" onclick="adjustValue('temp', -1)">-</button>
+                                <span id="val-temp" class="font-mono text-xl font-bold text-white">18</span>
+                                <button class="stepper-btn w-8 h-8 rounded text-lg flex items-center justify-center" onclick="adjustValue('temp', 1)">+</button>
+                            </div>
+                            <span class="text-slate-500 text-xl font-light">/</span>
+                            <!-- Dew -->
+                            <div class="flex items-center bg-slate-900 rounded border border-slate-700 p-1 flex-1 justify-between">
+                                <button class="stepper-btn w-8 h-8 rounded text-lg flex items-center justify-center" onclick="adjustValue('dew', -1)">-</button>
+                                <span id="val-dew" class="font-mono text-xl font-bold text-white">10</span>
+                                <button class="stepper-btn w-8 h-8 rounded text-lg flex items-center justify-center" onclick="adjustValue('dew', 1)">+</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- QNH Control -->
+                    <div>
+                        <label class="block text-xs text-slate-500 mb-2 font-bold tracking-wider">QNH (hPa)</label>
+                        <div class="flex items-center bg-slate-900 rounded border border-slate-700 p-1 justify-between">
+                            <button class="stepper-btn w-10 h-10 rounded text-xl flex items-center justify-center" onclick="adjustValue('qnh', -1)">-</button>
+                            <span id="val-qnh" class="font-mono text-2xl font-bold text-white">1013</span>
+                            <button class="stepper-btn w-10 h-10 rounded text-xl flex items-center justify-center" onclick="adjustValue('qnh', 1)">+</button>
+                        </div>
+                    </div>
+                 </div>
+            </div>
+
+            <!-- 3. Wind Inputs (Buttons) -->
+            <div class="glass-panel p-6 rounded-xl control-ui">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <!-- Wind Direction Controls -->
+                    <div class="md:col-span-2">
+                        <label class="block text-xs text-slate-500 mb-2 font-bold tracking-wider">WIND DIRECTION</label>
+                        <div class="flex flex-col gap-3">
+                            <div class="flex items-center bg-slate-900 rounded border border-slate-700 p-1 justify-between">
+                                <button class="stepper-btn w-12 h-10 rounded text-sm flex items-center justify-center" onclick="adjustDir(-10)">-10°</button>
+                                <span class="text-xs text-slate-500 font-bold tracking-widest">ADJUST</span>
+                                <button class="stepper-btn w-12 h-10 rounded text-sm flex items-center justify-center" onclick="adjustDir(10)">+10°</button>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="setDir(30)" class="flex-1 bg-slate-800 hover:bg-slate-700 active:bg-orange-600 border border-slate-600 rounded py-2 text-xs font-bold text-white transition-all shadow-lg active:scale-95">
+                                    RWY 03 (030°)
+                                </button>
+                                <button onclick="setDir(210)" class="flex-1 bg-slate-800 hover:bg-slate-700 active:bg-orange-600 border border-slate-600 rounded py-2 text-xs font-bold text-white transition-all shadow-lg active:scale-95">
+                                    RWY 21 (210°)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Speed Control -->
+                    <div>
+                        <label class="block text-xs text-slate-500 mb-2 font-bold tracking-wider">SPEED (KTS)</label>
+                        <div class="flex items-center bg-slate-900 rounded border border-slate-700 p-1 justify-between h-[50px]">
+                            <button class="stepper-btn w-10 h-full rounded text-lg flex items-center justify-center" onclick="adjustValue('windSpd', -1)">-</button>
+                            <span id="val-windSpd" class="font-mono text-2xl font-bold text-white">12</span>
+                            <button class="stepper-btn w-10 h-full rounded text-lg flex items-center justify-center" onclick="adjustValue('windSpd', 1)">+</button>
+                        </div>
+                    </div>
+
+                    <!-- Gusts Control -->
+                    <div>
+                        <label class="block text-xs text-slate-500 mb-2 font-bold tracking-wider">GUSTS (KTS)</label>
+                        <div class="flex items-center bg-slate-900 rounded border border-slate-700 p-1 justify-between h-[50px]">
+                            <button class="stepper-btn w-10 h-full rounded text-lg flex items-center justify-center" onclick="adjustValue('windGust', -1)">-</button>
+                            <span id="val-windGust" class="font-mono text-2xl font-bold text-white text-slate-500">0</span>
+                            <button class="stepper-btn w-10 h-full rounded text-lg flex items-center justify-center" onclick="adjustValue('windGust', 1)">+</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Only visible in Display Mode (clean atmos data) -->
+            <div class="glass-panel p-4 rounded-xl hidden" id="display-mode-atmos">
+                 <div class="flex justify-between items-center text-xl font-mono text-white px-8">
+                    <div><span class="text-slate-500 text-xs block">TEMP/DEW</span><span id="disp-temp">18</span>/<span id="disp-dew">10</span></div>
+                    <div><span class="text-slate-500 text-xs block">QNH</span><span id="disp-qnh">1013</span></div>
+                 </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+
+        // --- CONFIG ---
+        // IF YOU HOST THIS YOURSELF, REPLACE THE BELOW WITH YOUR OWN FIREBASE CONFIG
+        // You can get this from the Firebase Console -> Project Settings -> General
+        const firebaseConfig = {
+        apiKey: "AIzaSyDnLvje5aDBGUkkpNWjkzgYeXMORtq2NE4",
+        authDomain: "itfaiyeatis.firebaseapp.com",
+        projectId: "itfaiyeatis",
+        storageBucket: "itfaiyeatis.firebasestorage.app",
+        messagingSenderId: "482460597064",
+        appId: "1:482460597064:web:ea4ec82fe55b45ad88517d",
+        measurementId: "G-CLWYM5H7VE"
+        };
+        
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'itfaiyeatis-default';
+        
+        // --- APP LOGIC ---
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // State
+        let localState = {
+            windDir: 340,
+            windSpd: 12,
+            windGust: 0,
+            temp: 18,
+            dew: 10,
+            qnh: 1013
+        };
+
+        const limits = {
+            windSpd: { min: 0, max: 99 },
+            windGust: { min: 0, max: 99 },
+            temp: { min: -50, max: 60 },
+            dew: { min: -50, max: 60 },
+            qnh: { min: 900, max: 1100 }
+        };
+
+        // DOM elements
+        const arrow = document.getElementById('windArrow');
+        const compassSpeedDisplay = document.getElementById('compass-speed-display');
+        const dirTextDisplay = document.getElementById('dir-text');
+        const statusBadge = document.getElementById('conn-status');
+        const loader = document.getElementById('loader');
+
+        // Check Mode
+        const urlParams = new URLSearchParams(window.location.search);
+        const isDisplayMode = urlParams.get('mode') === 'display';
+
+        if (isDisplayMode) {
+            document.querySelectorAll('.control-ui').forEach(el => el.classList.add('display-mode-hidden'));
+            document.getElementById('display-mode-atmos').classList.remove('hidden');
+        }
+
+        // --- FIREBASE SYNC ---
+        async function init() {
+            try {
+                // Check if we have a custom token from the environment (internal use)
+                // For external use, it will fall back to anonymous
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                     // Using internal auth if available
+                     // Note: This specific function isn't imported from standard SDK usually, but in this env it is managed.
+                     // For external hosting, signInAnonymously is the way.
+                } 
+                
+                await signInAnonymously(auth);
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        statusBadge.innerText = "ONLINE";
+                        statusBadge.className = "bg-green-900 text-green-200 text-xs px-2 py-1 rounded border border-green-700 transition-colors";
+                        loader.style.display = 'none';
+                        setupRealtimeListener(user);
+                    } else {
+                        statusBadge.innerText = "AUTH FAIL";
+                        statusBadge.className = "bg-red-900 text-red-200";
+                    }
+                });
+
+            } catch (e) {
+                console.error("Auth Error", e);
+                statusBadge.innerText = "ERROR";
+                loader.innerText = "CONNECTION FAILED. CHECK CONSOLE.";
+            }
+        }
+
+        function setupRealtimeListener(user) {
+            // Path: artifacts/{appId}/public/data/atis
+            // We use 'public' data so both controller and display can see it without same-user login requirement
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'ltac_weather');
+
+            onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    localState = docSnap.data();
+                    updateUI();
+                } else {
+                    // Create doc if missing
+                    setDoc(docRef, localState);
+                }
+            }, (error) => {
+                console.error("Sync Error:", error);
+                statusBadge.innerText = "SYNC ERR";
+            });
+        }
+
+        async function pushUpdate() {
+            if (isDisplayMode) return; // Display mode cannot write
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'ltac_weather');
+            try {
+                await updateDoc(docRef, localState);
+            } catch (e) {
+                console.error("Write Error", e);
+            }
+        }
+
+        // --- UI LOGIC ---
+
+        window.adjustValue = function(key, delta) {
+            let newVal = localState[key] + delta;
+            if(limits[key]) {
+                if(newVal < limits[key].min) newVal = limits[key].min;
+                if(newVal > limits[key].max) newVal = limits[key].max;
+            }
+            localState[key] = newVal;
+            updateUI(); // Immediate local feedback
+            pushUpdate(); // Send to DB
+        };
+
+        window.adjustDir = function(delta) {
+            let newDir = localState.windDir + delta;
+            if (newDir > 360) newDir = 10;
+            if (newDir < 10) newDir = 360;
+            newDir = Math.round(newDir / 10) * 10;
+            localState.windDir = newDir;
+            updateUI();
+            pushUpdate();
+        };
+
+        window.setDir = function(val) {
+            localState.windDir = val;
+            updateUI();
+            pushUpdate();
+        };
+
+        function updateUI() {
+            // Update Controls (if visible)
+            if(!isDisplayMode) {
+                document.getElementById('val-temp').innerText = localState.temp;
+                document.getElementById('val-dew').innerText = localState.dew;
+                document.getElementById('val-qnh').innerText = localState.qnh;
+                document.getElementById('val-windSpd').innerText = localState.windSpd;
+                
+                const gustEl = document.getElementById('val-windGust');
+                gustEl.innerText = localState.windGust;
+                if(localState.windGust > 0) {
+                    gustEl.classList.remove('text-slate-500');
+                    gustEl.classList.add('text-orange-500');
+                } else {
+                    gustEl.classList.add('text-slate-500');
+                    gustEl.classList.remove('text-orange-500');
+                }
+            } else {
+                // Update Display Mode Text
+                document.getElementById('disp-temp').innerText = localState.temp;
+                document.getElementById('disp-dew').innerText = localState.dew;
+                document.getElementById('disp-qnh').innerText = localState.qnh;
+            }
+
+            // Common Updates (Compass)
+            compassSpeedDisplay.innerText = localState.windSpd;
+            const dirStr = localState.windDir.toString().padStart(3, '0') + "°";
+            dirTextDisplay.innerText = dirStr;
+            updateArrowVisuals();
+        }
+
+        // --- VISUALS ---
+        
+        // Compass Face Gen
+        function initCompassFace() {
+            const faceContainer = document.getElementById('compass-face');
+            const numberRadius = 145; 
+            const tickRadius = 125; 
+
+            for (let i = 10; i <= 360; i += 10) {
+                const numVal = i / 10;
+                const textStr = numVal.toString().padStart(2, '0');
+                const label = document.createElement('div');
+                label.innerText = textStr;
+                const isCardinal = (i % 90 === 0);
+                label.className = `compass-number ${isCardinal ? 'cardinal' : ''}`;
+                
+                const rad = (i - 90) * (Math.PI / 180);
+                const x = numberRadius * Math.cos(rad);
+                const y = numberRadius * Math.sin(rad);
+
+                label.style.left = `50%`;
+                label.style.top = `50%`;
+                label.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`;
+                faceContainer.appendChild(label);
+
+                const tick = document.createElement('div');
+                tick.className = isCardinal ? 'bg-orange-500' : 'bg-slate-500';
+                tick.style.position = 'absolute';
+                tick.style.left = '50%';
+                tick.style.top = '50%';
+                tick.style.width = isCardinal ? '3px' : '2px';
+                tick.style.height = isCardinal ? '12px' : '8px';
+                
+                const tx = tickRadius * Math.cos(rad);
+                const ty = tickRadius * Math.sin(rad);
+                tick.style.transform = `translate(-50%, -50%) translate(${tx}px, ${ty}px) rotate(${i}deg)`;
+                
+                faceContainer.appendChild(tick);
+            }
+        }
+
+        // Jitter & Clock
+        function updateClock() {
+            const now = new Date();
+            const h = now.getUTCHours().toString().padStart(2, '0');
+            const m = now.getUTCMinutes().toString().padStart(2, '0');
+            const s = now.getUTCSeconds().toString().padStart(2, '0');
+            document.getElementById('utc-clock').innerText = `${h}:${m}:${s} Z`;
+        }
+        setInterval(updateClock, 1000);
+
+        function fluctuateWind() {
+            const jitter = (Math.random() * 10) - 5; 
+            updateArrowVisuals(jitter);
+        }
+        setInterval(fluctuateWind, 3000);
+
+        function updateArrowVisuals(offset = 0) {
+            const displayDir = localState.windDir + offset;
+            arrow.style.transform = `translate(-50%, -100%) rotate(${displayDir}deg)`;
+        }
+
+        // Init
+        initCompassFace();
+        updateClock();
+        init(); // Start Firebase
+
+    </script>
+</body>
+</html>
