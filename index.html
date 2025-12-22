@@ -269,7 +269,7 @@
     <div id="loader">
         <div class="spinner"></div>
         <div id="loader-text" class="text-slate-400 font-mono text-sm tracking-widest text-center">
-            CONNECTING TO DATALINK...
+            IsraelGPT CONNECTING TO JEWLINK...
         </div>
     </div>
 
@@ -307,8 +307,8 @@
                 <div class="text-xl font-mono text-white font-bold digital-font">119.6</div>
             </div>
 
-            <!-- Live UTC Clock -->
-            <div class="glass-panel px-4 py-1 rounded flex flex-col items-center min-w-[120px]">
+            <!-- Live UTC Clock (Hidden in Display Mode via control-ui class) -->
+            <div class="glass-panel px-4 py-1 rounded flex flex-col items-center min-w-[120px] control-ui">
                 <div class="text-[9px] text-slate-400 font-bold tracking-widest">ZULU TIME</div>
                 <div id="utc-clock" class="text-xl font-mono text-white font-bold digital-font">00:00:00</div>
             </div>
@@ -510,6 +510,14 @@
                  </div>
             </div>
 
+            <!-- Display Mode Zulu Time (New) -->
+            <div class="glass-panel p-6 rounded-xl display-mode-show flex-col justify-center gap-2 min-w-[300px]" id="display-mode-clock">
+                <div class="flex justify-between items-end">
+                   <span class="text-slate-400 text-sm tracking-widest">ZULU TIME</span>
+                   <span id="disp-utc-clock" class="text-4xl font-bold text-white font-mono digital-font">00:00:00 Z</span>
+                </div>
+           </div>
+
         </div>
 
     </div>
@@ -583,6 +591,11 @@
             document.getElementById('display-mode-wind').classList.remove('hidden');
             document.getElementById('display-mode-wind').classList.add('flex');
             document.getElementById('display-mode-wind').style.display = 'flex';
+
+            // Show Clock
+            document.getElementById('display-mode-clock').classList.remove('hidden');
+            document.getElementById('display-mode-clock').classList.add('flex');
+            document.getElementById('display-mode-clock').style.display = 'flex';
         }
 
         // --- FIREBASE SYNC ---
@@ -811,7 +824,15 @@
             const h = now.getUTCHours().toString().padStart(2, '0');
             const m = now.getUTCMinutes().toString().padStart(2, '0');
             const s = now.getUTCSeconds().toString().padStart(2, '0');
-            document.getElementById('utc-clock').innerText = `${h}:${m}:${s} Z`;
+            
+            const timeStr = `${h}:${m}:${s} Z`;
+            
+            // Update small header clock
+            document.getElementById('utc-clock').innerText = timeStr;
+            
+            // Update large display clock if it exists
+            const dispClock = document.getElementById('disp-utc-clock');
+            if(dispClock) dispClock.innerText = timeStr;
         }
         setInterval(updateClock, 1000);
 
