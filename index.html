@@ -483,6 +483,15 @@
                 </div>
             </div>
 
+            <!-- Tempo Button Panel -->
+            <div class="glass-panel p-6 rounded-xl flex flex-col gap-6 control-ui border-orange-500/30 border-2">
+                <h2 class="text-orange-500 text-xs font-bold tracking-widest border-b border-orange-500/30 pb-2">SPECIAL ACTIONS</h2>
+                <button onclick="triggerTempo()" class="bg-slate-900 hover:bg-orange-600 border border-orange-500/50 text-white font-bold py-3 px-4 rounded shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 8v4l3 3"></path></svg>
+                    NOT QUITE MY TEMPO
+                </button>
+            </div>
+
             <!-- Display Mode Data (Hidden in Control Mode) -->
             <div class="glass-panel p-6 rounded-xl display-mode-show flex-col justify-center gap-8 min-w-[300px]" id="display-mode-atmos">
                  <h2 class="text-slate-400 text-sm font-bold tracking-widest border-b border-slate-700 pb-2 mb-2">METEOROLOGICAL DATA</h2>
@@ -522,6 +531,9 @@
 
     </div>
 
+    <!-- Tempo GIF (Hidden) -->
+    <img id="tempo-gif" src="" style="display: none; position: fixed; inset: 0; margin: auto; max-width: 90vw; max-height: 90vh; z-index: 9999; border-radius: 8px; box-shadow: 0 0 50px rgba(0,0,0,0.8);" />
+
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
@@ -559,8 +571,11 @@
             dew: 10,
             qnh: 1013,
             qfe: 898,
-            vis: 9999
+            vis: 9999,
+            tempoTrigger: 0
         };
+
+        let lastTempoTrigger = null;
 
         const limits = {
             windSpd: { min: 0, max: 99 },
@@ -633,12 +648,32 @@
         const COLLECTION_NAME = 'ltac_weather'; 
         const DOC_ID = 'live';
 
+        function showTempoGif() {
+            const gif = document.getElementById('tempo-gif');
+            if(gif) {
+                gif.src = "https://media1.tenor.com/m/xk3sUKAPVQkAAAAC/not-quite-my-tempo-whiplash.gif?" + new Date().getTime();
+                gif.style.display = 'block';
+                setTimeout(() => {
+                    gif.style.display = 'none';
+                }, 5000); 
+            }
+        }
+
         function setupRealtimeListener() {
             const docRef = doc(db, 'artifacts', appId, 'public', 'data', COLLECTION_NAME, DOC_ID);
 
             onSnapshot(docRef, (docSnap) => {
                 if (docSnap.exists()) {
-                    localState = docSnap.data();
+                    const data = docSnap.data();
+                    
+                    if (isDisplayMode && data.tempoTrigger) {
+                        if (lastTempoTrigger !== null && data.tempoTrigger > lastTempoTrigger) {
+                            showTempoGif();
+                        }
+                        lastTempoTrigger = data.tempoTrigger;
+                    }
+
+                    localState = data;
                     flashRx();
                     updateUI();
                 } else {
@@ -656,6 +691,14 @@
                 const docSnap = await getDoc(docRef);
                 if (docSnap.exists()) {
                     const data = docSnap.data();
+                    
+                    if (isDisplayMode && data.tempoTrigger) {
+                        if (lastTempoTrigger !== null && data.tempoTrigger > lastTempoTrigger) {
+                            showTempoGif();
+                        }
+                        lastTempoTrigger = data.tempoTrigger;
+                    }
+
                     if (JSON.stringify(data) !== JSON.stringify(localState)) {
                         localState = data;
                         flashRx();
@@ -690,6 +733,11 @@
 
         // --- UI LOGIC ---
         
+        window.triggerTempo = function() {
+            localState.tempoTrigger = Date.now();
+            pushUpdate();
+        };
+
         // Manual Input Handler
         window.manualInput = function(key, val) {
             let v = parseInt(val);
