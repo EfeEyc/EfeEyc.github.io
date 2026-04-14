@@ -486,10 +486,16 @@
             <!-- Tempo Button Panel -->
             <div class="glass-panel p-6 rounded-xl flex flex-col gap-6 control-ui border-orange-500/30 border-2">
                 <h2 class="text-orange-500 text-xs font-bold tracking-widest border-b border-orange-500/30 pb-2">SPECIAL ACTIONS</h2>
-                <button onclick="triggerTempo()" class="bg-slate-900 hover:bg-orange-600 border border-orange-500/50 text-white font-bold py-3 px-4 rounded shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 8v4l3 3"></path></svg>
-                    NOT QUITE MY TEMPO
-                </button>
+                <div class="flex gap-4">
+                    <button onclick="triggerTempo()" class="flex-1 bg-red-900 hover:bg-red-700 border border-red-500/50 text-white font-bold py-3 px-4 rounded shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 text-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="9" x2="15" y2="15"></line><line x1="15" y1="9" x2="9" y2="15"></line></svg>
+                        CUT IT / STOP
+                    </button>
+                    <button onclick="triggerKeepGoing()" class="flex-1 bg-green-900 hover:bg-green-700 border border-green-500/50 text-white font-bold py-3 px-4 rounded shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 text-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                        KEEP GOING
+                    </button>
+                </div>
             </div>
 
             <!-- Display Mode Data (Hidden in Control Mode) -->
@@ -532,7 +538,7 @@
     </div>
 
     <!-- Tempo GIF (Hidden) -->
-    <img id="tempo-gif" src="" style="display: none; position: fixed; inset: 0; margin: auto; max-width: 90vw; max-height: 90vh; z-index: 9999; border-radius: 8px; box-shadow: 0 0 50px rgba(0,0,0,0.8);" />
+    <img id="tempo-gif" src="" style="display: none; position: fixed; inset: 0; margin: auto; width: 100vw; height: 100vh; object-fit: contain; background: rgba(0,0,0,0.95); z-index: 9999;" />
 
     <!-- Firebase SDKs -->
     <script type="module">
@@ -572,10 +578,12 @@
             qnh: 1013,
             qfe: 898,
             vis: 9999,
-            tempoTrigger: 0
+            tempoTrigger: 0,
+            keepGoingTrigger: 0
         };
 
         let lastTempoTrigger = null;
+        let lastKeepGoingTrigger = null;
 
         const limits = {
             windSpd: { min: 0, max: 99 },
@@ -648,13 +656,14 @@
         const COLLECTION_NAME = 'ltac_weather'; 
         const DOC_ID = 'live';
 
-        function showTempoGif() {
+        function playGif(url) {
             const gif = document.getElementById('tempo-gif');
             if(gif) {
-                gif.src = "https://media1.tenor.com/m/xk3sUKAPVQkAAAAC/not-quite-my-tempo-whiplash.gif?" + new Date().getTime();
+                gif.src = url + "?" + new Date().getTime();
                 gif.style.display = 'block';
                 setTimeout(() => {
                     gif.style.display = 'none';
+                    gif.src = "";
                 }, 5000); 
             }
         }
@@ -666,11 +675,15 @@
                 if (docSnap.exists()) {
                     const data = docSnap.data();
                     
-                    if (isDisplayMode && data.tempoTrigger) {
-                        if (lastTempoTrigger !== null && data.tempoTrigger > lastTempoTrigger) {
-                            showTempoGif();
+                    if (isDisplayMode) {
+                        if (data.tempoTrigger && lastTempoTrigger !== null && data.tempoTrigger > lastTempoTrigger) {
+                            playGif("https://media1.tenor.com/m/KdQ8WRxaK7EAAAAC/stop-jk-simmons.gif");
                         }
-                        lastTempoTrigger = data.tempoTrigger;
+                        if (data.keepGoingTrigger && lastKeepGoingTrigger !== null && data.keepGoingTrigger > lastKeepGoingTrigger) {
+                            playGif("https://media1.tenor.com/m/josaiwe4bSoAAAAC/jk-simmons-whiplash.gif");
+                        }
+                        lastTempoTrigger = data.tempoTrigger || 0;
+                        lastKeepGoingTrigger = data.keepGoingTrigger || 0;
                     }
 
                     localState = data;
@@ -692,11 +705,15 @@
                 if (docSnap.exists()) {
                     const data = docSnap.data();
                     
-                    if (isDisplayMode && data.tempoTrigger) {
-                        if (lastTempoTrigger !== null && data.tempoTrigger > lastTempoTrigger) {
-                            showTempoGif();
+                    if (isDisplayMode) {
+                        if (data.tempoTrigger && lastTempoTrigger !== null && data.tempoTrigger > lastTempoTrigger) {
+                            playGif("https://media1.tenor.com/m/KdQ8WRxaK7EAAAAC/stop-jk-simmons.gif");
                         }
-                        lastTempoTrigger = data.tempoTrigger;
+                        if (data.keepGoingTrigger && lastKeepGoingTrigger !== null && data.keepGoingTrigger > lastKeepGoingTrigger) {
+                            playGif("https://media1.tenor.com/m/josaiwe4bSoAAAAC/jk-simmons-whiplash.gif");
+                        }
+                        lastTempoTrigger = data.tempoTrigger || 0;
+                        lastKeepGoingTrigger = data.keepGoingTrigger || 0;
                     }
 
                     if (JSON.stringify(data) !== JSON.stringify(localState)) {
@@ -735,6 +752,11 @@
         
         window.triggerTempo = function() {
             localState.tempoTrigger = Date.now();
+            pushUpdate();
+        };
+
+        window.triggerKeepGoing = function() {
+            localState.keepGoingTrigger = Date.now();
             pushUpdate();
         };
 
